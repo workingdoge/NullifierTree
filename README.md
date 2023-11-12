@@ -1,26 +1,26 @@
-# Mina zkApp: Index Merkle Tree
 
-This template uses TypeScript.
 
-## How to build
+- more efficient proofs
 
-```sh
-npm run build
-```
+- two tree model -> one tree for storing (commitments to) data 
+                 -> another tree for signalling if data is stale (nullifier tree)
+      - consuming data emits a nullifier
+      - nullifier has a deterministic derivation from original state
 
-## How to run tests
+- legacy approach: sparse merkle trees
+  - updatable merkle tree with as many leaves as values
+  - membership proofs for null values
+  - tree blows up in size (2**254) (lots of hashing)
 
-```sh
-npm run test
-npm run testw # watch mode
-```
+-  use a linked list of nodes to prove what is missing
 
-## How to run coverage
+Node 1 -- next higher value --> Node 2
+1 -> 10 (then 2-9 doesn't exist)
 
-```sh
-npm run coverage
-```
-
-## License
-
-[Apache-2.0](LICENSE)
+- we extend append only trees
+  - at each leaf we store 3 values
+  - Val
+  - Next index
+  - Next Value
+- Val -> nextVal will have nothing in it
+- we have a proof of non-inclusion of a value $x$ by a proof of inclusion of a node where val < $x$ < nextVal
