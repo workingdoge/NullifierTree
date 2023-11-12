@@ -1,5 +1,5 @@
 
-
+## Note:
 - more efficient proofs
 
 - two tree model -> one tree for storing (commitments to) data 

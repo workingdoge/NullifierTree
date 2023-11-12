@@ -57,6 +57,7 @@ export class NullifierLeavesWithIdxs {
       return { lowerNullifier: upperNullifier }
     }
 
+    // binary search
     while (low <= high) {
       const mid = Math.floor((low + high) / 2);
       const currentLeaf = this.leaves[mid];
@@ -156,36 +157,75 @@ export const Test = ZkProgram({
         root.assertEquals(new NullifierTree().tree.getRoot())
       }
     },
-    validNullifier: {
-      privateInputs: [Field, Field, NullifierLeaf, NullifierWitness, SelfProof],
-      method(root: Field, value: Field, leafHash: Field, leaf: NullifierLeaf, witness: NullifierWitness, nt_proof: SelfProof<Field, Empty>) {
+    insert_within: {
+      // NOTE: Source only allows 7 fields
+      privateInputs: [
+        Field,
+        Field,
+        NullifierLeaf,
+        NullifierWitness,
+        Field,
+        NullifierWitness,
+        SelfProof
+      ],
+      method(
+        updatedRoot: Field,
+        value: Field,
+        originalNullifierHash: Field,
+        originalNullifier: NullifierLeaf,
+        pre_witness: NullifierWitness,
+        newNullifierHash: Field,
+        newNullifierWitness: NullifierWitness,
+        nt_proof: SelfProof<Field, Empty>
+      ) {
         nt_proof.verify()
 
-        // not sure this constraint is needed
-        // root.assertEquals(nt_proof.publicInput)
+        // check nullifier is located in nullifier tree
+        pre_witness.calculateRoot(originalNullifierHash).assertEquals(nt_proof.publicInput)
+
+        // check value is between the nullifier range
+        originalNullifier.value.assertLessThan(value)
+        value.assertLessThan(originalNullifier.nextValue)
+
+        // check values have been included and updated in the updated tree
+        newNullifierWitness.calculateRoot(newNullifierHash).assertEquals(updatedRoot)
+      }
+    },
+    insert_greatest: {
+      privateInputs: [
+        Field,
+        NullifierLeaf,
+        Field,
+        NullifierWitness,
+        Field,
+        NullifierWitness,
+        SelfProof
+      ],
+      method(
+        updatedRoot: Field,
+        value: Field,
+        originalNullifier: NullifierLeaf,
+        originalNullifierHash: Field,
+        pre_witness: NullifierWitness,
+        newNullifierHash: Field,
+        newNullifierWitness: NullifierWitness,
+        nt_proof: SelfProof<Field, Empty>
+      ) {
+        nt_proof.verify()
 
         // check nullifier is located in nullifier tree
-        witness.calculateRoot(leafHash).assertEquals(root)
+        pre_witness.calculateRoot(originalNullifierHash).assertEquals(nt_proof.publicInput)
+        //
+        // // check value is between the nullifier range
+        originalNullifier.nextValue.assertEquals(Field(0))
+        originalNullifier.value.assertLessThan(value)
 
-        // check value is in range of nullifier
-        // Proof.if leaf.value.equals(0) 
-        // leaf.value.assertLessThan(value).or(leaf.value.assertEquals(Field(0)))
-        // nt = new NullifierTree()
-        value.assertLessThan(leaf.nextValue)
+        // check value has been included in the updated tree
+        // TODO: check both inclusion and update, only checks inclusion
+        newNullifierWitness.calculateRoot(newNullifierHash).assertEquals(updatedRoot)
 
       }
     },
-    insert: {
-      privateInputs: [NullifierLeaf, NullifierWitness, SelfProof, SelfProof],
-      method(updatedRoot: Field, newNullifier: NullifierLeaf, witness: NullifierWitness, validNullifierProof: SelfProof<Field, Empty>, nt_proof: SelfProof<Field, Empty>) {
-
-        nt_proof.verify();
-        validNullifierProof.verify();
-        validNullifierProof.publicInput.assertEquals(nt_proof.publicInput)
-
-      }
-
-    }
   }
 })
 

@@ -1,5 +1,6 @@
 import { ZkProgram, Field, Proof } from 'o1js';
-import { NullifierTree, NullifierWitness, NullifierLeavesWithIdxs, NullifierLeaf, Test } from './indexed_merkle_tree';
+import { NullifierTree, NullifierWitness, NullifierLeavesWithIdxs, NullifierLeaf, NullifierLeafWithIdx, Test } from './nullifier_tree.js';
+import _ from 'lodash';
 
 
 describe('NullifierLeavesWithIdxs', () => {
@@ -99,58 +100,68 @@ describe('NullifierLeavesWithIdxs', () => {
     let nt: NullifierTree
     let initProof: Proof<Field, void>
     let initRoot: Field
-    let validNullifierProof: Proof<Field, void>
     beforeAll(async () => {
       let Proof = ZkProgram.Proof(Test)
       console.log('program digest', Test.digest())
 
-      // console.log('Compiling Proof...')
+      console.log('Compiling Proof...')
       let { verificationKey } = await Test.compile()
-      // console.log('verification key', verificationKey.slice(0, 10) + '..');
+      console.log('verification key', verificationKey.slice(0, 10) + '..');
+
+      nt = new NullifierTree()
     })
 
 
     it('initalize', async () => {
-      nt = new NullifierTree()
       initRoot = nt.tree.getRoot()
-      // console.log('prove init')
+      console.log('prove init')
       initProof = await Test.init(
         nt.tree.getRoot()
       )
 
       console.log('verify init...');
-      // initProof.verify()
+      initProof.verify()
       console.log('init verified')
     });
 
-    xit('validNullifier', async () => {
+    it('insert a value greater then all other values', async () => {
 
-      let value = Field(3)
+      let value = Field(10)
 
       let range = nt.leavesWithIdxs.find_range(value)
-      let originalNullifier = range.lowerNullifier;
+      // by hand because deepcopy is hard
+      let originalNullifier: NullifierLeafWithIdx = {
+        leaf_idx: 0n,
+        leaf: NullifierLeaf.empty()
+      }
 
-      let witness = new NullifierWitness(nt.tree.getWitness(originalNullifier.leaf_idx));
-      console.log("Calculated Root from Witness:", witness.calculateRoot(Field(originalNullifier.leaf.hash())).toString());
-      console.log("Current Tree Root:", nt.tree.getRoot().toString());
 
+      let pre_witness = new NullifierWitness(nt.tree.getWitness(originalNullifier.leaf_idx));
+      let originalNullifierHash = originalNullifier.leaf.hash()
 
-      console.log('prove validNullifier')
-      validNullifierProof = await Test.validNullifier(
-        initRoot,
+      let { lowerNullifier, newNullifier } = nt.leavesWithIdxs.insert(value)
+      nt.insert(lowerNullifier, newNullifier)
+
+      let updatedRoot = nt.tree.getRoot()
+
+      let newNullifierWitness = new NullifierWitness(nt.tree.getWitness(newNullifier.leaf_idx))
+
+      let insert_greatest_proof = await Test.insert_greatest(
+        updatedRoot,
         value,
-        originalNullifier.leaf.hash(),
         originalNullifier.leaf,
-        witness,
+        originalNullifierHash,
+        pre_witness,
+        newNullifier.leaf.hash(),
+        newNullifierWitness,
         initProof
       )
 
-      console.log('verify init...');
-      validNullifierProof.verify()
+      insert_greatest_proof.verify()
       console.log('nullifier is valid')
     });
 
-    xit('validNullifier', async () => {
+    xit('insert a value in between other values', async () => {
       // let { lowerNullifier, newNullifier } = nt.leavesWithIdxs.insert(value)
       // console.log(lowerNullifier.leaf_idx, lowerNullifier.leaf.toJSON())
       // nt.insert(lowerNullifier, newNullifier)
